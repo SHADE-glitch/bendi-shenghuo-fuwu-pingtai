@@ -237,7 +237,7 @@ Each highlight is framed as **business problem → technical solution → why it
 | **Backend** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway (V1–V17) · Redisson 3.37.0 (`RLock.tryLock`) · Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
 | **Storage** | MySQL 8 (business data) · Redis 7.2 (cache / Stream `SECKILL_STREAM_KEY` / GEO `SHOP_GEO_KEY` / session tokens / locks; AOF enabled) |
 | **Frontend** | Vue 3.5 · TypeScript 6.0 · Vite 8 · Vant 4.9 · Tailwind CSS 4 · Pinia 3 (+ persistedstate) · Vue Router 5 · TanStack Vue Query 5 · Axios · `qrcode` / `jsqr` |
-| **Testing** | Backend: JUnit 5 · AssertJ · MockMvc · a real concurrency harness (39 classes / 242 cases — `mvn -B test` green on 2026-10-29) · a 52-item API smoke script. Frontend: Vitest 4 (120 cases, 9 files) · Vue Test Utils · MSW · Playwright 1.54 (9 specs) · ESLint 10 / Prettier 3 |
+| **Testing** | Backend: JUnit 5 · AssertJ · MockMvc · a real concurrency harness (39 classes / 242 cases — `mvn -B test` green on 2026-10-29) · a 52-item API smoke script. Frontend: Vitest 4 (120 passed + 1 todo, 9 files, 2026-10-29) · Vue Test Utils · MSW · Playwright 1.54 (9 specs) · ESLint 10 / Prettier 3 |
 | **Infra** | Docker Compose (MySQL, Redis, hot-reloading backend, frontend dev server) · GitHub Actions CI |
 
 ---
@@ -324,7 +324,7 @@ the conditions it was measured under.
 |---|---|---|
 | JUnit (backend) | printed by `mvn -B test` | Runs on `@SpringBootTest` against a live MySQL/Redis — **not** an isolated container, so each run is paired with a stock reconciliation |
 | API smoke | **52 checks** | `bash backend/tests/api-crud-smoke.sh` against a running backend |
-| Vitest (frontend) | **120 cases / 9 files** | `npm run test` |
+| Vitest (frontend) | **120 passed + 1 todo / 9 files** (2026-10-29) | `npm run test` |
 | Playwright (frontend) | **9 specs** | Consumer + merchant journeys |
 
 ### Seckill concurrency result (reference run)
