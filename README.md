@@ -1,6 +1,6 @@
 <p align="right"><a href="README.md"><b>English</b></a> | <a href="README.zh-CN.md">简体中文</a></p>
 
-# 🍜 Local Life Service Platform
+# 🍜 本地生活服务平台 (Local Life Service Platform)
 
 A full-stack **local life service platform** — a Dianping-style app where users browse shops, buy or
 flash-sale (seckill) vouchers, and merchants manage their shops, vouchers and redemptions. It is a
@@ -18,9 +18,9 @@ authorization, shop ownership, voucher management, and order redemption.
 ![Vue](https://img.shields.io/badge/Vue-3.5-42b883?logo=vue.js&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker%20Compose-ready-2496ED?logo=docker&logoColor=white)
 
-[![Frontend CI](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/frontend-ci.yml)
-[![Backend CI](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/backend-ci.yml)
-[![Full-stack E2E](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/e2e-fullstack.yml/badge.svg)](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/e2e-fullstack.yml)
+[![Frontend CI](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/frontend-ci.yml)
+[![Backend CI](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/backend-ci.yml)
+[![Full-stack E2E](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/e2e-fullstack.yml/badge.svg)](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/e2e-fullstack.yml)
 
 **What it is** — A full-stack, Dianping-style local life service platform (Spring Boot modular monolith + Vue 3 mobile web).
 
@@ -69,7 +69,7 @@ flowchart LR
         P["Merchant auth<br/>WriteAuthInterceptor +<br/>MerchantShopGuard"]
     end
 
-    DB[("MySQL 8<br/>Flyway V1–V16")]
+    DB[("MySQL 8<br/>Flyway V1–V17")]
     RD[("Redis 7.2<br/>cache · session ·<br/>Lua · Stream · GEO · locks")]
 
     U -->|HTTP| V
@@ -127,7 +127,7 @@ Stream consumer (single-thread executor)
 | 📱 | **Mobile-first SPA** | Vant 4 + Tailwind CSS 4 — home, blog, messages, merchant console, profile, settings |
 | 🔐 | **Auth** | Token in Redis (carries `role`), `RefreshTokenInterceptor` + `LoginInterceptor` chain |
 | 🖼️ | **File uploads** | `UploadController` → local `uploads/icon` (2 MB, jpg / jpeg / png / webp) |
-| 🗃️ | **Schema automation** | Flyway V1–V16 builds the schema + seeds **1,290** shops across 45 cities and 13,601 vouchers (2,682 of them seckill) — no manual SQL |
+| 🗃️ | **Schema automation** | Flyway V1–V17 builds the schema + seeds **1,290** shops across 45 cities and 13,601 vouchers (2,682 of them seckill) — no manual SQL |
 | 🐳 | **Docker infra** | Full-stack Compose with DevTools hot-reload + Vite HMR |
 
 ---
@@ -148,7 +148,8 @@ Each highlight is framed as **business problem → technical solution → why it
 - **Why.** The atomic check has to live where the mutable state already is. Lua keeps "read stock,
   check claim, decrement, mark claimed" from interleaving, so the check and the decrement cannot be
   split by another request. The DB CAS and unique key mean that even a stale Redis view cannot produce
-  oversell or a duplicate.
+  oversell or a duplicate. The synchronous purchase endpoint is deliberately type-checked: a seckill
+  voucher cannot be bought there, so it cannot bypass the sale window or the Lua pre-deduction.
 
 ### 2. Making the seckill responsive without losing the order
 
@@ -211,7 +212,10 @@ Each highlight is framed as **business problem → technical solution → why it
 - **Solution.** Release the lock from a `TransactionSynchronization.afterCompletion` callback, so it is
   only released after the transaction actually resolves.
 - **Why.** "Hold the lock until the work it protects is durable" is the whole point of the lock; tying
-  release to transaction completion is the only way to guarantee it.
+  release to transaction completion is the only way to guarantee it. The same boundary governs stock
+  compensation: cancel/refund compensation is registered on `afterCommit`, runs `INCR` and `SREM` in
+  one Lua script, uses a `SET NX` marker so a replay cannot add stock twice, and falls back to a
+  dead-letter list after bounded retries.
 
 ### 7. Fast "shops near me" without hammering the DB
 
@@ -230,10 +234,10 @@ Each highlight is framed as **business problem → technical solution → why it
 
 | Layer | Technologies |
 |---|---|
-| **Backend** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway (V1–V16) · Redisson 3.37.0 (`RLock.tryLock`) · Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
+| **Backend** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway (V1–V17) · Redisson 3.37.0 (`RLock.tryLock`) · Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
 | **Storage** | MySQL 8 (business data) · Redis 7.2 (cache / Stream `SECKILL_STREAM_KEY` / GEO `SHOP_GEO_KEY` / session tokens / locks; AOF enabled) |
 | **Frontend** | Vue 3.5 · TypeScript 6.0 · Vite 8 · Vant 4.9 · Tailwind CSS 4 · Pinia 3 (+ persistedstate) · Vue Router 5 · TanStack Vue Query 5 · Axios · `qrcode` / `jsqr` |
-| **Testing** | Backend: JUnit 5 · AssertJ · MockMvc · a real concurrency harness (34 classes / 213 cases — the 2026-10-23 surefire run; current source is 39 classes / 242 `@Test`, not yet re-run) · a 52-item API smoke script. Frontend: Vitest 4 (120 cases, 9 files) · Vue Test Utils · MSW · Playwright 1.54 (9 specs) · ESLint 10 / Prettier 3 |
+| **Testing** | Backend: JUnit 5 · AssertJ · MockMvc · a real concurrency harness (39 classes / 242 cases — `mvn -B test` green on 2026-10-29) · a 52-item API smoke script. Frontend: Vitest 4 (120 cases, 9 files) · Vue Test Utils · MSW · Playwright 1.54 (9 specs) · ESLint 10 / Prettier 3 |
 | **Infra** | Docker Compose (MySQL, Redis, hot-reloading backend, frontend dev server) · GitHub Actions CI |
 
 ---
@@ -248,8 +252,8 @@ Each highlight is framed as **business problem → technical solution → why it
 ### 1. Configure environment
 
 ```bash
-git clone https://github.com/SHADE-glitch/Local-life-service-platform.git
-cd Local-life-service-platform
+git clone https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai.git
+cd bendi-shenghuo-fuwu-pingtai
 cp .env.example .env
 ```
 

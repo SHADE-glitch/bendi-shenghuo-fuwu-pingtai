@@ -16,9 +16,9 @@
 ![Vue](https://img.shields.io/badge/Vue-3.5-42b883?logo=vue.js&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker%20Compose-ready-2496ED?logo=docker&logoColor=white)
 
-[![Frontend CI](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/frontend-ci.yml)
-[![Backend CI](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/backend-ci.yml)
-[![Full-stack E2E](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/e2e-fullstack.yml/badge.svg)](https://github.com/SHADE-glitch/Local-life-service-platform/actions/workflows/e2e-fullstack.yml)
+[![Frontend CI](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/frontend-ci.yml)
+[![Backend CI](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/backend-ci.yml)
+[![Full-stack E2E](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/e2e-fullstack.yml/badge.svg)](https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai/actions/workflows/e2e-fullstack.yml)
 
 **是什么** — 一个仿大众点评的全栈本地生活服务平台（Spring Boot 模块化单体 + Vue 3 移动端）。
 
@@ -65,7 +65,7 @@ flowchart LR
         P["商家鉴权<br/>WriteAuthInterceptor +<br/>MerchantShopGuard"]
     end
 
-    DB[("MySQL 8<br/>Flyway V1–V16")]
+    DB[("MySQL 8<br/>Flyway V1–V17")]
     RD[("Redis 7.2<br/>缓存 · 会话 ·<br/>Lua · Stream · GEO · 锁")]
 
     U -->|HTTP| V
@@ -123,7 +123,7 @@ Stream 消费者（单线程执行器）
 | 📱 | **移动端 SPA** | Vant 4 + Tailwind CSS 4——首页、博客动态、消息、商家后台、我的、设置 |
 | 🔐 | **登录态** | Token 落 Redis（含 `role`），`RefreshTokenInterceptor` + `LoginInterceptor` 链路 |
 | 🖼️ | **文件上传** | `UploadController` → 本地 `uploads/icon`（2 MB，jpg / jpeg / png / webp） |
-| 🗃️ | **零配置数据库** | Flyway V1–V16 自动建库 + 灌入 45 城 **1,290** 家商铺与 **13,601** 张优惠券（其中 2,682 张为秒杀券，无需手动导 SQL） |
+| 🗃️ | **零配置数据库** | Flyway V1–V17 自动建库 + 灌入 45 城 **1,290** 家商铺与 **13,601** 张优惠券（其中 2,682 张为秒杀券，无需手动导 SQL） |
 | 🐳 | **Docker 基础设施** | 全栈 Compose，DevTools 热重载 + Vite HMR |
 
 ---
@@ -140,7 +140,7 @@ Stream 消费者（单线程执行器）
   Redis Stream 并立即返回。随后由单线程消费者落库：幂等 `count(userId, voucherId)`、
   `stock = stock - 1 WHERE stock > 0` 的 CAS、`INSERT`。`(userId, voucherId)` 上的 DB 唯一键做最后兜底。
 - **为什么这么设计。** 原子校验必须放在可变状态所在的地方。Lua 让「读库存、判占位、扣减、标记占位」
-  不被其他请求打断。DB 的 CAS 与唯一键则保证：即便 Redis 视图过期，也不会超卖或产生重复单。
+  不被其他请求打断。DB 的 CAS 与唯一键则保证：即便 Redis 视图过期，也不会超卖或产生重复单。同步购买入口刻意做了券类型校验：秒杀券不能走该入口，因此无法绕过活动时间窗与 Lua 预扣。
 
 ### 2. 秒杀既要快，又不能丢单
 
@@ -192,7 +192,9 @@ Stream 消费者（单线程执行器）
   可能读到未提交的状态。（记录为 `UF-004`。）
 - **技术方案。** 把解锁放进 `TransactionSynchronization.afterCompletion` 回调，只有事务真正结束后才释放。
 - **为什么这么设计。** 「锁要持有到它保护的工作真正落定」正是锁存在的意义；把释放绑定到事务完成，
-  是保证这一点的唯一方式。
+  是保证这一点的唯一方式。同一条边界也约束库存补偿：取消/退款补偿注册在 `afterCommit`，
+  `INCR` 与 `SREM` 合并进同一段 Lua，`SET NX` 幂等标记保证重放不会重复加库存，
+  有界重试后失败转入死信队列。
 
 ### 7. 快速「附近门店」且不打爆数据库
 
@@ -209,7 +211,7 @@ Stream 消费者（单线程执行器）
 
 | 层级 | 技术 |
 |---|---|
-| **后端** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway（V1–V16）· Redisson 3.37.0（`RLock.tryLock`）· Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
+| **后端** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway（V1–V17）· Redisson 3.37.0（`RLock.tryLock`）· Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
 | **存储** | MySQL 8（业务数据）· Redis 7.2（缓存 / Stream `SECKILL_STREAM_KEY` / GEO `SHOP_GEO_KEY` / 会话令牌 / 锁；开启 AOF） |
 | **前端** | Vue 3.5 · TypeScript 6.0 · Vite 8 · Vant 4.9 · Tailwind CSS 4 · Pinia 3（+ persistedstate）· Vue Router 5 · TanStack Vue Query 5 · Axios · `qrcode` / `jsqr` |
 | **测试** | 后端：JUnit 5 · AssertJ · MockMvc · 真实并发压测 · 52 项 API 冒烟脚本；前端：Vitest 4（120 用例 / 9 文件）· Vue Test Utils · MSW · Playwright 1.54（9 spec）· ESLint 10 / Prettier 3 |
@@ -227,8 +229,8 @@ Stream 消费者（单线程执行器）
 ### 1. 配置环境变量
 
 ```bash
-git clone https://github.com/SHADE-glitch/Local-life-service-platform.git
-cd Local-life-service-platform
+git clone https://github.com/SHADE-glitch/bendi-shenghuo-fuwu-pingtai.git
+cd bendi-shenghuo-fuwu-pingtai
 cp .env.example .env
 ```
 
