@@ -1,0 +1,101 @@
+name: Frontend CI
+
+# 前端门禁：安装依赖 → 检查（lint / typecheck / 单测）→ 构建 → 上传 dist 产物。
+# 零基础设施依赖（不需要 MySQL / Redis / 后端），分钟级完成。
+#
+# 触发说明：
+#   - `pull_request`：PR 上自动跑（PR 的 check 就来自这里）
+#   - `push: branches: [master]`：只有合并进 master 才再跑一次
+#     为什么 push 只限 master？如果写成 `push:`（所有分支），那么「往已有 PR 的分支 push」
+#     会同时触发 push 和 pull_request 两个事件，同一次提交跑两遍、PR 上出现两条重复 check。
+#   - `workflow_dispatch`：手动兜底，可在 Actions 页面点按钮重跑
+#   - `paths-ignore`：纯文档改动（任意 .md）不触发 CI：全栈 E2E 单次约 5 分钟，
+#     改 README 不该触发它。
+#     代价是纯文档 PR 不会产生 check。
+#
+# 每一步为什么这么做：
+#   - `npm ci` 而不是 `npm install`：项目有 package-lock.json，ci 会严格按 lockfile 安装，
+#     保证 CI 装到的依赖与本地一致、可复现；install 则可能改写 lockfile。
+#   - lint 用 `npx eslint src` 而不是 `npm run lint`：后者是 `eslint src --fix`，
+#     --fix 会修改文件；CI 应当只检查、不写文件。
+#   - typecheck 用 `npx vue-tsc -b`：项目没有单独的 typecheck script，
+#     但 `npm run build` 的第一步就是它；单独拆出来是为了让「类型错误」和「构建错误」分开报。
+#   - 单测与构建直接复用 package.json 已有 scripts，不新增任何 lint 规则 / 测试框架。
+#     唯一的增量是覆盖率：v8 provider（@vitest/coverage-v8）只出报告、不设 thresholds。
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  frontend:
+    name: Install · Check · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Node 版本依据：frontend/Dockerfile 用 node:22-alpine，本地开发环境也是 v22。
+      # 注意 package.json 里没有 `engines` 字段，所以这是依据项目现有约定推断（非强制声明）。
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          # 缓存 npm 的下载缓存目录（~/.npm），key 由 lockfile 哈希决定。
+          # 只缓存下载缓存，不缓存 node_modules —— node_modules 仍然每次由 npm ci 重建。
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint src
+
+      - name: Typecheck
+        run: npx vue-tsc -b
+
+      # 覆盖率版单测：跑的是同一套用例，额外由 v8 provider 产出 coverage/ 报告。
+      # 只出报告、不设 thresholds —— 覆盖率不达标不会让 CI 变红。
+      - name: Unit tests + coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      # 覆盖率报告：测试失败时也上传，方便定位。
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-life-frontend-coverage
+          path: frontend/coverage
+          if-no-files-found: ignore
+          retention-days: 1
+
+      # 只上传真正有价值的构建产物 dist，而不是整个前端工作目录。
+      # `if-no-files-found: error`：构建没产出 dist 说明有问题，应直接失败而不是悄悄跳过。
+      # artifact 名称保持稳定（不带 SHA），方便在 Actions 页面反复下载；每次运行本身已被 run 隔离。
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-life-frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 1

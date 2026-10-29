@@ -1,0 +1,116 @@
+server:
+  port: ${SERVER_PORT:8081}
+  servlet:
+    context-path: /
+  # Graceful shutdown: stop accepting new requests, then drain for up to 30s
+  # (Spring Boot reads `server.shutdown` + `spring.lifecycle.timeout-per-shutdown-phase`;
+  # the previous `server.graceful-shutdown.*` keys bound to nothing and were silently ignored).
+  shutdown: graceful
+  # Response compression configuration
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/xml,application/xml
+    min-response-size: 1024  # Compress responses >= 1KB
+    compression-level: 6     # GZIP level (1-9)
+
+spring:
+  application:
+    name: hm-dianping
+
+  # Matches the 2 MB check in FileStorageServiceImpl: the framework default (1 MB) used to
+  # reject 1–2 MB icons before the service-level check could run.
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  # Flyway（DB migrations）
+  #
+  # baseline-version 是显式的，不依赖 Flyway 的隐式默认值 1（P1-6）：
+  #   * 空库：baseline-on-migrate 对空 schema 不生效，V1~V17 全量执行（V1 是完整 dump，
+  #     含 DROP TABLE IF EXISTS，因此「空库全量迁移」本身就是可重复的）。
+  #   * 非空库（还原了 schema 但丢了 flyway_schema_history）：baseline 记为 11，
+  #     V1~V11 跳过、V12~V17 执行。取值依据是「最后一个非幂等迁移」——V8 是裸
+  #     ADD CONSTRAINT、V11 是裸 CREATE INDEX，重放必失败；V12 起全部是
+  #     CREATE TABLE IF NOT EXISTS 或 information_schema 守卫，可安全重放。
+  #   * V1~V11 契约更旧的库（例如只还原了最初的 hmdp.sql）不支持原地升级：
+  #     那套 schema 与当前代码的契约（V2~V4 的 Contract Update）本就不匹配，
+  #     请还原备份或重建，不要靠调小 baseline-version 硬跑。
+  # 已发布的迁移一律不改写：改动会改变校验和，让所有已执行过该迁移的库在
+  # validate 阶段启动失败（Flyway 没有「只忽略校验和」的开关）。
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: ${SPRING_FLYWAY_BASELINE_VERSION:11}
+    # 生产禁止 clean：clean 会 DROP 整个 schema。Flyway 9+ 默认即 true，这里显式写死。
+    clean-disabled: true
+
+  # Redis 配置
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:127.0.0.1}
+      port: ${SPRING_REDIS_PORT:6379}
+      # 必须经环境变量注入，且刻意不给默认值：缺失时启动直接失败，
+      # 不会静默退化成「无认证 Redis」。
+      password: ${SPRING_REDIS_PASSWORD}
+      database: 0
+      timeout: 10000
+      lettuce:
+        pool:
+          max-active: 64      # Increase from 8 to 64
+          max-wait: -1ms      # No limit on wait time
+          max-idle: 64        # Match max-active
+          min-idle: 16        # Keep warm connections
+      connect-timeout: 3000ms
+
+  # MySQL 配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf8}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:rootpassword}
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: is_deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 日志配置
+logging:
+  level:
+    com.hmdp: debug
+    org.springframework.data.redis: info
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+
+# 文件上传 & Mock 功能配置
+hmdp:
+  upload-dir: ${HMDP_UPLOAD_DIR:uploads/icon}
+  mock-enabled: false  # MUST be false in production
+
+# Actuator & Metrics configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    traces:
+      enabled: true

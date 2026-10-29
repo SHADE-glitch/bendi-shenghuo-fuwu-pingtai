@@ -1,0 +1,327 @@
+@import "tailwindcss";
+
+:root {
+  /* Vant theme colors - kept for compatibility */
+  --van-primary-color: #533afd;
+  --van-danger-color: #ea2261;
+  --van-warning-color: #f97316;
+  --van-success-color: #10b981;
+  --van-text-color: #0d253d;
+  --van-text-color-2: #273951;
+  --van-text-color-3: #64748d;
+  --van-border-color: #e3e8ee;
+  --van-background: #f6f9fc;
+  --van-background-2: #ffffff;
+  --van-radius-md: 8px;
+  --van-radius-lg: 12px;
+
+  /* Stripe Design System Colors */
+  --color-primary: #533afd;
+  --color-primary-deep: #4434d4;
+  --color-primary-press: #2e2b8c;
+  --color-primary-soft: #665efd;
+  --color-primary-bg-subdued-hover: #b9b9f9;
+  --color-brand-dark-900: #1c1e54;
+  --color-ink: #0d253d;
+  --color-ink-secondary: #273951;
+  --color-ink-mute: #64748d;
+  --color-ink-mute-2: #61718a;
+  --color-on-primary: #ffffff;
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #f6f9fc;
+  --color-canvas-cream: #f5e9d4;
+  --color-hairline: #e3e8ee;
+  --color-hairline-input: #a8c3de;
+  --color-ruby: #ea2261;
+  --color-magenta: #f96bee;
+  --color-lemon: #9b6829;
+  --color-shadow-blue: #003770;
+
+  /* Application theme mapping */
+  --c-page-bg: var(--color-canvas-soft);
+  --c-card-bg: var(--color-canvas);
+  --c-text-1: var(--color-ink);
+  --c-text-2: var(--color-ink-secondary);
+  --c-text-3: var(--color-ink-mute);
+  --c-border: var(--color-hairline);
+  
+  /* Stripe-style gradient mesh backdrop */
+  --c-hero-bg: linear-gradient(135deg, var(--color-canvas-cream) 0%, var(--color-lemon) 25%, var(--color-magenta) 50%, var(--color-primary) 75%, var(--color-ruby) 100%);
+}
+
+.van-theme-dark {
+  --c-page-bg: #1c1e54;
+  --c-card-bg: #0d253d;
+  --c-text-1: #ffffff;
+  --c-text-2: #b9b9f9;
+  --c-text-3: #64748d;
+  --c-border: rgba(255, 255, 255, 0.08);
+  --c-hero-bg: linear-gradient(135deg, #2e2b8c 0%, #4434d4 64%, #1c1e54 100%);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+  background: var(--color-canvas-soft);
+  font-family: "Inter", "Sohne-var", "SF Pro Display", system-ui, -apple-system, sans-serif;
+  color: var(--color-ink);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01";
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+#app {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  overflow-x: hidden;
+  background: var(--color-canvas);
+  box-shadow: 0 0 0 1px var(--color-hairline);
+}
+
+.van-button--primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.van-button--primary.van-button--plain {
+  color: var(--color-primary);
+  background: transparent;
+}
+
+.van-nav-bar {
+  --van-nav-bar-title-font-size: 16px;
+  --van-nav-bar-title-font-weight: 800;
+}
+
+/* 导航栏右侧动作按钮：外观对齐 Vant 的 .van-nav-bar__text，但是真 <button>，
+   因此需要抹掉浏览器默认按钮样式（字号由 .van-nav-bar__right 继承）。 */
+.van-nav-bar__text-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--van-nav-bar-text-color);
+  cursor: pointer;
+}
+
+.van-tabbar {
+  --van-tabbar-background: rgba(255, 255, 255, 0.96);
+}
+
+.van-theme-dark .van-tabbar {
+  --van-tabbar-background: rgba(17, 24, 39, 0.96);
+}
+
+.van-toast {
+  background: var(--van-toast-background, rgba(0, 0, 0, 0.7)) !important;
+  color: var(--van-toast-text-color, #fff) !important;
+}
+
+/* Stripe Design System Utility Classes */
+
+/* Typography - Display with negative tracking */
+.stripe-display-xxl {
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1.03;
+  letter-spacing: -1.4px;
+}
+
+.stripe-display-xl {
+  font-size: 48px;
+  font-weight: 300;
+  line-height: 1.15;
+  letter-spacing: -0.96px;
+}
+
+.stripe-display-lg {
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.64px;
+}
+
+.stripe-display-md {
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1.12;
+  letter-spacing: -0.26px;
+}
+
+.stripe-heading-lg {
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.22px;
+}
+
+.stripe-heading-md {
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+}
+
+.stripe-body-lg {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.4;
+}
+
+.stripe-body-md {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.4;
+}
+
+.stripe-body-tabular {
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: -0.42px;
+  font-feature-settings: "tnum";
+}
+
+.stripe-button-md {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.0;
+}
+
+.stripe-button-sm {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.0;
+}
+
+.stripe-caption {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -0.39px;
+}
+
+/* Gradient Mesh Backdrop */
+.gradient-mesh {
+  background: var(--c-hero-bg);
+  background-size: 200% 200%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Card Elevation */
+.card-stripe-light {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: 12px;
+  box-shadow: rgba(0, 55, 112, 0.08) 0 1px 3px;
+}
+
+.card-stripe-cream {
+  background: var(--color-canvas-cream);
+  border-radius: 12px;
+}
+
+.card-stripe-dark {
+  background: var(--color-brand-dark-900);
+  color: var(--color-on-primary);
+  border-radius: 12px;
+}
+
+/* Button Styles */
+.btn-stripe-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: 9999px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-stripe-primary:hover {
+  background: var(--color-primary-deep);
+}
+
+.btn-stripe-primary:active {
+  background: var(--color-primary-press);
+}
+
+.btn-stripe-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-stripe-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: var(--color-canvas);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 9999px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-stripe-secondary:hover {
+  background: var(--color-canvas-soft);
+}
+
+/* Input Styles */
+.input-stripe {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline-input);
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.4;
+  transition: border-color 0.2s ease;
+}
+
+.input-stripe:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.input-stripe::placeholder {
+  color: var(--color-ink-mute);
+}

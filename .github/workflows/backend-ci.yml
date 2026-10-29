@@ -1,0 +1,131 @@
+name: Backend CI
+
+# 后端门禁：起真实依赖 → 编译 + 测试 + 打包（一条 Maven 命令）→ 上传 JAR 与测试报告。
+#
+# 为什么必须起 MySQL / Redis：
+#   backend/src/test 下 30 个测试类 / 203 个方法，除 2 个纯单测外都继承 WebIntegrationTestBase
+#   （@SpringBootTest + @AutoConfigureMockMvc，注入真实的 StringRedisTemplate / JdbcTemplate）。
+#   项目没有 testcontainers / H2 / src/test/resources，测试直接读 src/main/resources/application.yml，
+#   所以没有「不依赖外部服务」的跑法。RabbitMQ 本项目不使用。
+#
+# 为什么用 docker compose 而不是 service containers：
+#   仓库已有 docker-compose.yml（mysql:8.0 + redis:7.2-alpine，带 healthcheck），
+#   优先复用仓库既有测试环境，不另起一套配置。这里只启动 mysql / redis 两个服务，
+#   不启动 compose 里的 backend / frontend（那是本地开发用的热重载服务）。
+#
+# 为什么只有一条 Maven 命令：
+#   `mvn verify` 会依次跑完 validate → compile → test → package → verify，
+#   即「编译 + 测试 + 打包」一次完成，JAR 也在这一步产出。
+#   不需要 `mvn test` + `mvn package` 连着写两遍（那是重复执行）。
+#
+# 触发说明同 frontend-ci.yml：push 只限 master，避免与 PR 事件重复触发；
+# 纯文档改动（任意 .md）由 paths-ignore 跳过，不触发一次完整的构建与测试。
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Test · Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Shanghai
+      # 宿主端口改用 13306 / 16379：避开 GitHub runner 上可能预装并占用 3306 / 6379 的服务
+      MYSQL_PORT: '13306'
+      REDIS_PORT: '16379'
+      # docker compose 插值用（compose 会把这两个变量传给 mysql 容器）
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hmdp
+      # runner 上直接跑 mvn 时 Spring 读取这些变量（application.yml 用的是 ${ENV:default} 占位符）。
+      # 说明：这里没有真实密钥 —— 密码是本地测试用的固定值，与 .env.example 的默认口径一致。
+      # 注意 application.yml 的密码默认值是 rootpassword，api-crud-smoke.sh 的默认值也是 rootpassword，
+      # 而 .env.example 写的是 change-me；三者不一致会导致直连 DB 的断言失败，故这里显式统一。
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:13306/hmdp?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+      SPRING_REDIS_HOST: 127.0.0.1
+      SPRING_REDIS_PORT: '16379'
+      # application.yml 的 redis 密码刻意无默认值（缺失即启动失败，不静默退化成无认证 Redis）；
+      # 值必须与 .env 里传给 redis 容器的 REDIS_PASSWORD 一致（当前 .env.example 为 change-me）。
+      SPRING_REDIS_PASSWORD: 'change-me'
+      SERVER_PORT: '8081'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # docker compose 会自动读取同目录的 .env 做 ${...} 插值；仓库里 .env 被 gitignore，
+      # 所以先由 .env.example 生成一份。此处 sed 只是把口径统一为下面 job env 的值
+      # （.env.example 的 MYSQL_ROOT_PASSWORD=change-me 与 application.yml / 冒烟脚本的 rootpassword 不一致）。
+      - name: Prepare .env for docker compose
+        run: |
+          cp .env.example .env
+          sed -i 's|^MYSQL_PORT=.*|MYSQL_PORT=13306|' .env
+          sed -i 's|^REDIS_PORT=.*|REDIS_PORT=16379|' .env
+          sed -i 's|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=rootpassword|' .env
+          sed -i 's|^SPRING_DATASOURCE_PASSWORD=.*|SPRING_DATASOURCE_PASSWORD=rootpassword|' .env
+
+      - name: Start MySQL and Redis
+        run: docker compose up -d --wait mysql redis
+
+      # JDK 17 依据 pom.xml 的 <java.version>17</java.version> 与 maven-compiler-plugin 的 source/target 17。
+      # `cache: maven` 缓存 ~/.m2/repository，key 由 pom.xml 哈希决定，避免每次重新下载全部依赖。
+      # 项目没有 Maven Wrapper（无 mvnw / .mvn），所以直接用 setup-java 提供的 mvn。
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Compile, test and package
+        working-directory: backend
+        run: mvn -B verify
+
+      # 只上传打包产物本身（Spring Boot repackage 后的可执行 JAR），不含 target 下的中间文件。
+      # 只有前面的步骤全部成功才会走到这里 —— 测试失败时不会产出「看起来可用」的 JAR。
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-life-backend-jar
+          path: backend/target/*.jar
+          if-no-files-found: error
+          retention-days: 1
+
+      # 测试报告单独上传，并且 `if: always()`：测试失败时更需要这份报告来定位问题。
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-life-backend-test-reports
+          path: backend/target/surefire-reports
+          if-no-files-found: ignore
+          retention-days: 1
+
+      # JaCoCo 覆盖率报告（由 pom.xml 的 jacoco-maven-plugin 在 test 阶段生成）。
+      # 只出报告、不设门槛 —— 覆盖率不达标不会让 CI 变红。
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-life-backend-jacoco
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,39 @@
+# ==================================================================
+# 测试专用 Spring Profile —— 由 pom.xml 的 surefire 统一激活
+# ==================================================================
+# 目的：把集成测试的 Redis 键空间与「正在运行的应用」物理隔开。
+#
+# 为什么需要（2026-10-06 审计 F-11 运行时复现）：
+#   src/test/resources 此前不存在，全仓也没有任何 @ActiveProfiles /
+#   @TestPropertySource / @DynamicPropertySource，因此 10 个 @SpringBootTest
+#   直接吃主 application.yml 的 `spring.data.redis.database: 0`——
+#   与运行中的应用同一个 Redis 实例、同一个键空间。
+#   实测 `XINFO CONSUMERS stream:seckill:orders seckill-group` 出现 5 个消费者，
+#   其中 UUID 消费者是「运行中应用 + 测试上下文」共同注册、
+#   `consumer-foreign-stale-test` 是 SeckillStreamClaimRecoveryTest 造的：
+#   跑一次 `mvn test` 会让测试上下文加入线上秒杀消费组，与应用竞争消费消息。
+#
+# 隔离方式：测试改用 database 15（Redis 默认 16 个库，0~15），
+#   stream:seckill:orders / login:token:* / cache:shop:* / lock:* 等键
+#   在测试期间全部落在 DB 15，测试结束随 DB 15 一起丢弃，
+#   不再触碰线上 DB 0 的任何键，也就不会改动冻结不变量
+#   （XPENDING / DLQ / XLEN / seckill:stock 等）。
+#
+# 为什么是 surefire 的 systemPropertyVariables 而不是每个测试类加 @ActiveProfiles：
+#   10 个 @SpringBootTest 类逐个加注解属于「分散、易漏」；
+#   在 pom.xml 一处注入 spring.profiles.active=test 对全部测试类一次性生效，
+#   且新增测试类默认就是隔离的，不需要记得写注解。
+#
+# 注意：本文件只覆盖 Redis 库号，其余配置（host/port/password、数据源）
+# 刻意继承 application.yml —— 数据源仍指向 dev 库，这是既有测试的既定前提，
+# 不在本次隔离范围内（测试会 DELETE+INSERT tb_user/tb_user_info，见审计记录）。
+# ==================================================================
+spring:
+  data:
+    redis:
+      database: 15
+
+logging:
+  level:
+    # 测试期默认 INFO，避免 MyBatis 把每条 SQL 与每次参数绑定打进日志
+    com.hmdp: info

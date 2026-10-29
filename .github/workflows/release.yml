@@ -1,0 +1,179 @@
+name: Release
+
+# 版本化交付（Continuous Delivery，**不是 Deployment**）：
+# 收到版本 Tag → 构建 → 产出发布文件 → 创建 GitHub Release。
+# 不部署到任何服务器（本项目没有服务器），只把可下载的构建产物发出来。
+#
+# 触发：只有推送 `v*` 形式的版本 Tag 才会跑。
+#   **刻意不使用 `push: branches:`** —— Release 必须由「版本」决定，而不是由「某次提交」决定。
+#   也不加 `workflow_dispatch`：手动触发时 github.ref_name 不是 Tag，会创建出错误的 Release。
+#
+# 四个 workflow 各管一件事，不合并成一个大 YAML：
+#   frontend-ci.yml    前端持续集成（push master / PR）
+#   backend-ci.yml     后端持续集成（push master / PR）
+#   e2e-fullstack.yml  全栈验证（push master / PR）
+#   release.yml        版本化交付（tag v*）—— 本文件
+#
+# 为什么 Release 不重跑 Playwright E2E（57 条）与 API 冒烟（52 项）：
+#   这两层要额外「启动后端 + Flyway 播种 + 安装浏览器」，约 3–4 分钟，
+#   而且**不产出任何发布资产**。它们在同一个 commit 上已由 e2e-fullstack.yml 把关，
+#   在 Release 里再跑一遍只是重复计时，并不会让产物更可信。
+#   这里保留的是「产出资产所必需」的两步：
+#     - 前端 `npm run build`（= vue-tsc -b && vite build，含类型检查）
+#     - 后端 `mvn verify`（编译 + 203 JUnit + 打包）
+#   后端选 verify 而不是 package：MySQL/Redis 反正要起，多跑测试的增量成本≈0，
+#   却能挡住「tag 打在一个从未通过后端 CI 的 commit 上」这种情况。
+#
+# 权限：`contents: write` 是 `gh release create` 的最小必需权限，只给本 workflow。
+#   本 workflow 只在 tag push 时触发，PR（含 fork PR）永远不会命中它，
+#   因此不存在「fork PR 借此拿到写权限」的路径。其余 CI workflow 一律只读。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # 发布过程不应被后来的运行取消
+
+jobs:
+  release:
+    name: Build · Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Shanghai
+      # 宿主端口用 13306 / 16379，避开 runner 上可能预装并占用 3306 / 6379 的服务
+      MYSQL_PORT: '13306'
+      REDIS_PORT: '16379'
+      # docker compose 插值用；密码是本地测试用的固定值，不是真实密钥
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hmdp
+      # runner 上跑 mvn 时 Spring 读取这些变量（application.yml 用 ${ENV:default} 占位符）
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:13306/hmdp?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+      SPRING_REDIS_HOST: 127.0.0.1
+      SPRING_REDIS_PORT: '16379'
+      # application.yml 的 redis 密码刻意无默认值（缺失即启动失败，不静默退化成无认证 Redis）；
+      # 值必须与 .env 里传给 redis 容器的 REDIS_PASSWORD 一致（当前 .env.example 为 change-me）。
+      SPRING_REDIS_PASSWORD: 'change-me'
+      SERVER_PORT: '8081'
+      # gh CLI 用 runner 自带的 GITHUB_TOKEN 认证，不依赖个人 PAT
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # docker compose 自动读取同目录 .env 做插值，而 .env 被 gitignore，故先由 .env.example 生成。
+      # sed 只是把密码口径统一为 job env 的值（.env.example 写的是 change-me）。
+      - name: Prepare .env for docker compose
+        run: |
+          cp .env.example .env
+          sed -i 's|^MYSQL_PORT=.*|MYSQL_PORT=13306|' .env
+          sed -i 's|^REDIS_PORT=.*|REDIS_PORT=16379|' .env
+          sed -i 's|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=rootpassword|' .env
+          sed -i 's|^SPRING_DATASOURCE_PASSWORD=.*|SPRING_DATASOURCE_PASSWORD=rootpassword|' .env
+
+      # 203 个 JUnit 里除 2 个纯单测外都继承 WebIntegrationTestBase，需要真实 MySQL + Redis
+      # （项目没有 testcontainers / H2），故复用仓库既有的 docker-compose.yml。
+      - name: Start MySQL and Redis
+        run: docker compose up -d --wait mysql redis
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      # 一条命令 = 编译 + 203 JUnit + 打包，产出的可执行 JAR 就是发布资产之一
+      - name: Backend test and package
+        working-directory: backend
+        run: mvn -B verify
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # npm run build = `vue-tsc -b && vite build`，类型检查 + 产出 frontend/dist
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+
+      # 只整理真正要发布的两个文件，不碰 node_modules / target / 源码目录 / Maven 缓存 / 日志
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          OUT="${RUNNER_TEMP}/release-assets"
+          mkdir -p "$OUT"
+
+          # 后端：Spring Boot repackage 后的可执行 JAR，改名带上版本号
+          mapfile -t JARS < <(find backend/target -maxdepth 1 -type f -name '*.jar')
+          if [ "${#JARS[@]}" -ne 1 ]; then
+            echo "::error::expected exactly 1 jar in backend/target, found ${#JARS[@]}"
+            printf '%s\n' "${JARS[@]}"
+            exit 1
+          fi
+          cp "${JARS[0]}" "$OUT/local-life-backend-${TAG}.jar"
+
+          # 前端：把 dist 的内容打包成 zip（解压即站点根目录）
+          (cd frontend/dist && zip -qr "$OUT/local-life-frontend-${TAG}.zip" .)
+
+          echo "=== release assets ==="
+          ls -lh "$OUT"
+
+      - name: Create GitHub Release
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          OUT="${RUNNER_TEMP}/release-assets"
+          NOTES="${RUNNER_TEMP}/release-notes.md"
+
+          # 标题用 Tag；正文只写可核实的事实，不编造变更内容（仓库没有 CHANGELOG）
+          cat > "$NOTES" <<EOF
+          ## 版本 ${TAG}
+
+          - 提交：\`${GITHUB_SHA}\`
+          - 构建：GitHub Actions \`release.yml\` —— 前端 \`npm run build\`（类型检查 + 打包）；后端 \`mvn verify\`（编译 + 203 个 JUnit + 打包）
+
+          ### 发布产物
+
+          | 文件 | 说明 |
+          |---|---|
+          | \`local-life-frontend-${TAG}.zip\` | 前端静态构建产物（\`frontend/dist\` 打包，解压即站点根目录） |
+          | \`local-life-backend-${TAG}.jar\` | 后端可执行 Spring Boot JAR（\`java -jar\` 启动） |
+
+          > 本 Release 只提供构建产物，**不包含部署**。运行后端需自备 MySQL 8 与 Redis 7，并配置 \`SPRING_DATASOURCE_*\` / \`SPRING_REDIS_*\`。
+          EOF
+
+          # 语义化版本里带 `-` 的是预发布（如 v0.1.0-test / v1.0.0-rc.1），标记为 Pre-release，
+          # 避免它被 GitHub 当成 Latest release
+          PRE=""
+          case "$TAG" in *-*) PRE="--prerelease" ;; esac
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — refreshing assets"
+            gh release upload "$TAG" "$OUT"/*.zip "$OUT"/*.jar --clobber
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              $PRE \
+              --notes-file "$NOTES" \
+              "$OUT"/*.zip \
+              "$OUT"/*.jar
+          fi
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

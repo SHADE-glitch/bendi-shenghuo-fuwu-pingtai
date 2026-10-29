@@ -1,0 +1,74 @@
+# 后端
+backend/target/
+backend/.idea/
+backend/.settings/
+backend/*.iml
+backend/.classpath
+backend/.project
+backend/.factorypath
+backend/logs/
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+frontend/.vite/
+frontend/coverage/
+frontend/.turbo/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+.cache/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 测试覆盖率
+coverage/
+*.lcov
+.nyc_output/
+
+# 测试输出与证据（含登录 Token 等敏感信息，不入库，保留在本地磁盘）
+test-results/
+
+# playwright-cli 交互式驱动产物（快照等）
+.playwright-cli/
+
+# Docker
+.dockerignore
+
+# 其他
+*.bak
+*.backup
+*.orig
+
+# 机器级运行态忽略（STANDARD.md §4）
+# 测试时 Python 工具链或游离的 SQLite 会落在仓内，别让它们进 git status。
+.venv/
+venv/
+__pycache__/
+*.db
+*.db-wal
+*.db-shm
+.pytest_cache/
+reports/

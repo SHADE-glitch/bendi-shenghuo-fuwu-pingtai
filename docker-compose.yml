@@ -1,0 +1,96 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: Local-life-service-platform-redis
+    ports:
+      # 只绑定回环地址：Redis 内含登录态（login:token:*）与秒杀库存，
+      # 不应暴露到宿主机的其它网卡上（0.0.0.0 绑定等于把会话交给同网段任何人）。
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # requirepass 必须经 shell 展开 $$ 才能拿到 compose 注入的值；
+    # 若直接写 --requirepass ${REDIS_PASSWORD}，compose 会在解析阶段展开并把明文留在 argv。
+    command: sh -c 'redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    container_name: Local-life-service-platform-mysql
+    ports:
+      # 只绑定回环地址：3306 同样不应对同网段暴露。
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # DB schema/seed will be initialized by backend Flyway migrations on app startup
+    command: --default-authentication-plugin=mysql_native_password --default-time-zone='+08:00'
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    image: maven:3.9-eclipse-temurin-17
+    container_name: Local-life-service-platform-backend
+    working_dir: /app
+    ports:
+      - "${SERVER_PORT:-8081}:8081"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        mvn compile;
+        while true; do sleep 3; mvn compile; done &
+        exec mvn spring-boot:run
+      "
+    volumes:
+      - ./backend:/app
+      - ./backend/settings.xml:/root/.m2/settings.xml
+      - backend_m2:/root/.m2/repository
+      - backend_uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: Local-life-service-platform-frontend
+    ports:
+      - "${VITE_DEV_PORT:-5173}:5173"
+    environment:
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET}
+      VITE_AMAP_KEY: ${VITE_AMAP_KEY}
+      VITE_AMAP_SECURITY_CODE: ${VITE_AMAP_SECURITY_CODE}
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:
+  mysql_data:
+  backend_uploads:
+  backend_m2:
+  frontend_node_modules:

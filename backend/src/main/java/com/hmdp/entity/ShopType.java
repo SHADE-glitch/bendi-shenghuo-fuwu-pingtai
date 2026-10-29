@@ -1,0 +1,63 @@
+package com.hmdp.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.Accessors;
+
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
+/**
+ * 商铺类型实体类
+ * <p>
+ * 对应数据库表 tb_shop_type，记录商铺的分类信息，如美食、酒店、娱乐等。
+ * 包含类型名称、图标 URL 和展示排序字段，用于首页分类导航展示。
+ * </p>
+ */
+@Data
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+@TableName("tb_shop_type")
+public class ShopType implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键
+     */
+    @TableId(value = "id", type = IdType.AUTO)
+    private Long id;
+
+    /**
+     * 类型名称
+     */
+    private String name;
+
+    /**
+     * 图标
+     */
+    private String icon;
+
+    /**
+     * 顺序
+     */
+    private Integer sort;
+
+    /**
+     * 创建时间
+     */
+    @JsonIgnore
+    private LocalDateTime createTime;
+
+    /**
+     * 更新时间
+     */
+    @JsonIgnore
+    private LocalDateTime updateTime;
+
+
+}

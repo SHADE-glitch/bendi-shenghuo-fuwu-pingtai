@@ -1,0 +1,177 @@
+name: Full-stack E2E
+
+# 全栈真实链路门禁：起 MySQL + Redis → 打包后端并启动 → API 冒烟 → Playwright E2E（mock + real + merchant）。
+#
+# 与另外两个 workflow 的分工（三个 workflow 各管一件事，互不重叠）：
+#   - frontend-ci.yml  ：前端静态检查 + 单测 + 构建（零 infra，分钟级）
+#   - backend-ci.yml   ：后端 JUnit（203 方法）+ 打包 JAR（需要 MySQL + Redis）
+#   - e2e-fullstack.yml：本文件 —— 真实浏览器跑完整业务链路（需要 MySQL + Redis + 后端进程 + 浏览器）
+#
+# 为什么这里**不再跑 JUnit**：那是 backend-ci.yml 的职责。本文件只做「打 JAR 并启动」，
+# 用 `-DskipTests` 跳过测试，避免同一套 203 个测试在两个 workflow 里各跑一遍。
+#
+# 本仓库特有的注意点（这些都是踩过的坑，不是模板）：
+#  1. `.env` 被 gitignore，而 docker compose 需要它做变量插值 → 必须先由 .env.example 生成。
+#  2. 密码口径要统一为 rootpassword：application.yml 的默认值与 api-crud-smoke.sh 的默认值都是它，
+#     而 .env.example 写的是 change-me，不一致会让冒烟脚本里直连 DB 的断言失败。
+#  3. 宿主端口用 13306 / 16379，避开 runner 预装服务占用的 3306 / 6379。
+#  4. 后端用 runner 上的 JAR 启动（而不是 compose 的 backend 服务）：
+#     compose backend 的 healthcheck 依赖容器内 wget，maven 镜像不保证有；
+#     改为 runner 侧 curl 轮询 /actuator/health 更可靠。
+#  5. Playwright 配置默认 `channel: 'chrome'`，runner 上没有系统 Chrome，故 E2E_CHANNEL=chromium。
+#  6. playwright.config.ts 的 globalSetup 对**所有** project（含 mock）都要求后端健康 + Redis 可写，
+#     所以不存在「纯 mock、免后端」的 CI 路径。
+#  7. e2e/global-setup.ts 与 e2e/helpers/merchant.ts 通过 `docker exec` 进入**固定容器名**，
+#     因此 mysql / redis 必须用 docker compose 启动（container_name 固定），不能用 Actions service containers。
+#  8. 不纳入 CI：backend/tests/seckill_concurrency_final.py（冻结黑名单，禁止重跑/覆盖）与
+#     `ab /shops/1`（性能基准，非门禁）。
+#  9. E2E 对状态敏感（retries: 0）。若变红，先核对 T1–T5 的修复是否复发。
+# 10. 纯文档改动（任意 .md）由 paths-ignore 跳过：本 workflow 单次约 5 分钟，
+#     是全仓库最贵的一个，改 README 不该触发它。
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fullstack-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fullstack:
+    name: API smoke · Playwright E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      TZ: Asia/Shanghai
+      MYSQL_PORT: '13306'
+      REDIS_PORT: '16379'
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hmdp
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:13306/hmdp?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+      SPRING_REDIS_HOST: 127.0.0.1
+      SPRING_REDIS_PORT: '16379'
+      # application.yml 的 redis 密码刻意无默认值（缺失即启动失败，不静默退化成无认证 Redis）；
+      # 值必须与 .env 里传给 redis 容器的 REDIS_PASSWORD 一致（当前 .env.example 为 change-me）。
+      SPRING_REDIS_PASSWORD: 'change-me'
+      # 冒烟脚本与 Playwright e2e helper 用 `docker exec redis-cli` 直连，需带 -a 认证；
+      # 与 redis 容器的 requirepass（.env 的 REDIS_PASSWORD）一致。
+      REDIS_PASSWORD: 'change-me'
+      SERVER_PORT: '8081'
+      # runner 无系统 Chrome，Playwright 改用自带 chromium
+      E2E_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Prepare .env for docker compose
+        run: |
+          cp .env.example .env
+          sed -i 's|^MYSQL_PORT=.*|MYSQL_PORT=13306|' .env
+          sed -i 's|^REDIS_PORT=.*|REDIS_PORT=16379|' .env
+          sed -i 's|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=rootpassword|' .env
+          sed -i 's|^SPRING_DATASOURCE_PASSWORD=.*|SPRING_DATASOURCE_PASSWORD=rootpassword|' .env
+
+      - name: Start MySQL and Redis
+        run: docker compose up -d --wait mysql redis
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      # 只打包、不跑测试：203 个 JUnit 方法已由 backend-ci.yml 负责
+      - name: Package backend jar
+        working-directory: backend
+        run: mvn -B -DskipTests package
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          nohup java -jar target/hm-dianping-0.0.1-SNAPSHOT.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/backend.pid"
+
+      # Flyway 首次迁移要建表并播种上千店铺 / 13602 张券，启动偏慢，故最多等 450 秒
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8081/actuator/health >/dev/null 2>&1; then
+              echo "backend healthy after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::backend did not become healthy within 450s"
+          tail -n 200 "$RUNNER_TEMP/backend.log" || true
+          exit 1
+
+      - name: API smoke
+        run: |
+          command -v jq >/dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y jq; }
+          bash backend/tests/api-crud-smoke.sh
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright E2E (mock + real + merchant)
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p fullstack-logs
+          docker compose ps > fullstack-logs/compose-ps.txt 2>&1 || true
+          docker compose logs --no-color > fullstack-logs/compose-logs.txt 2>&1 || true
+          cp "$RUNNER_TEMP/backend.log" fullstack-logs/backend.log 2>/dev/null || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-life-e2e-artifacts
+          if-no-files-found: ignore
+          path: |
+            frontend/test-results
+            fullstack-logs
+          retention-days: 1
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/backend.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/backend.pid")" 2>/dev/null || true
+          fi
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
