@@ -214,7 +214,7 @@ Stream 消费者（单线程执行器）
 | **后端** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway（V1–V17）· Redisson 3.37.0（`RLock.tryLock`）· Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
 | **存储** | MySQL 8（业务数据）· Redis 7.2（缓存 / Stream `SECKILL_STREAM_KEY` / GEO `SHOP_GEO_KEY` / 会话令牌 / 锁；开启 AOF） |
 | **前端** | Vue 3.5 · TypeScript 6.0 · Vite 8 · Vant 4.9 · Tailwind CSS 4 · Pinia 3（+ persistedstate）· Vue Router 5 · TanStack Vue Query 5 · Axios · `qrcode` / `jsqr` |
-| **测试** | 后端：JUnit 5 · AssertJ · MockMvc · 真实并发压测 · 52 项 API 冒烟脚本；前端：Vitest 4（120 用例 / 9 文件）· Vue Test Utils · MSW · Playwright 1.54（9 spec）· ESLint 10 / Prettier 3 |
+| **测试** | 后端：JUnit 5 · AssertJ · MockMvc · 真实并发压测 · 52 项 API 冒烟脚本；前端：Vitest 4（120 passed + 1 todo / 9 文件，2026-10-29）· Vue Test Utils · MSW · Playwright 1.54（9 spec）· ESLint 10 / Prettier 3 |
 | **基础设施** | Docker Compose（MySQL、Redis、热重载后端、前端开发服务器）· GitHub Actions CI |
 
 ---
@@ -300,7 +300,7 @@ docker compose up -d --build
 |---|---|---|
 | JUnit（后端） | 由 `mvn -B test` 打印 | 基于 `@SpringBootTest` 直连真实 MySQL/Redis，**不是隔离容器**，所以每次执行都配一次库存对账 |
 | API 冒烟 | **52 项** | `bash backend/tests/api-crud-smoke.sh`（需后端已启动） |
-| Vitest（前端） | **120 用例 / 9 文件** | `npm run test` |
+| Vitest（前端） | **120 passed + 1 todo / 9 文件**（2026-10-29） | `npm run test` |
 | Playwright（前端） | **9 spec** | 消费者 + 商家全链路 |
 
 ### 秒杀并发结果（引用轮）
