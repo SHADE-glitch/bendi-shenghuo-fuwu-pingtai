@@ -9,6 +9,8 @@
 项目有两条主线：**消费者侧**聚焦缓存策略、高并发下单与分布式协同；
 **商家侧**补上完整的角色鉴权、店铺归属、券管理与订单核销闭环。
 
+> **公开的纯代码展示仓。** 本仓只保留可运行代码与技术栈；完整开发历史、测试产物与面试文档在私有归档中。
+
 ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-brightgreen?logo=springboot&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
@@ -214,7 +216,7 @@ Stream 消费者（单线程执行器）
 | **后端** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway（V1–V17）· Redisson 3.37.0（`RLock.tryLock`）· Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
 | **存储** | MySQL 8（业务数据）· Redis 7.2（缓存 / Stream `SECKILL_STREAM_KEY` / GEO `SHOP_GEO_KEY` / 会话令牌 / 锁；开启 AOF） |
 | **前端** | Vue 3.5 · TypeScript 6.0 · Vite 8 · Vant 4.9 · Tailwind CSS 4 · Pinia 3（+ persistedstate）· Vue Router 5 · TanStack Vue Query 5 · Axios · `qrcode` / `jsqr` |
-| **测试** | 后端：JUnit 5 · AssertJ · MockMvc · 真实并发压测 · 52 项 API 冒烟脚本；前端：Vitest 4（120 passed + 1 todo / 9 文件，2026-10-29）· Vue Test Utils · MSW · Playwright 1.54（9 spec）· ESLint 10 / Prettier 3 |
+| **测试** | 后端：JUnit 5 · AssertJ · MockMvc · 真实并发压测（39 类 / 242 用例 — `mvn -B test` 于 2026-10-29 全绿，0 failures / 0 errors / 0 skipped）· 52 项 API 冒烟脚本；前端：Vitest 4（120 passed + 1 todo / 9 文件，2026-10-29）· Vue Test Utils · MSW · Playwright 1.54（9 spec）· ESLint 10 / Prettier 3 |
 | **基础设施** | Docker Compose（MySQL、Redis、热重载后端、前端开发服务器）· GitHub Actions CI |
 
 ---
@@ -294,7 +296,7 @@ docker compose up -d --build
 
 ## 🧪 测试
 
-以下数字来自 `backend/test-results/` 的落盘产物。每个数字都连同其测试条件一起引用。
+以下数字来自 `backend/test-results/` 的落盘产物（**未入库**，仅存在于本地磁盘）。每个数字都连同其测试条件一起引用。
 
 | 套件 | 规模 | 说明 |
 |---|---|---|

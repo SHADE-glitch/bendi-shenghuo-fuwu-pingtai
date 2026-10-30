@@ -11,6 +11,9 @@ The project has two storylines. The **consumer side** is about caching strategy,
 ordering, and distributed coordination. The **merchant side** adds a complete loop of role-based
 authorization, shop ownership, voucher management, and order redemption.
 
+> **Public, code-only showcase.** This repository carries the runnable code and the stack. Full
+> development history, test artifacts and interview notes live in a private archive.
+
 ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-brightgreen?logo=springboot&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
@@ -237,7 +240,7 @@ Each highlight is framed as **business problem → technical solution → why it
 | **Backend** | Java 17 · Spring Boot 3.3.5 · MyBatis-Plus 3.5.7 · Flyway (V1–V17) · Redisson 3.37.0 (`RLock.tryLock`) · Hutool 5.8.40 · Lombok · Spring Actuator · Micrometer Prometheus · JaCoCo 0.8.13 |
 | **Storage** | MySQL 8 (business data) · Redis 7.2 (cache / Stream `SECKILL_STREAM_KEY` / GEO `SHOP_GEO_KEY` / session tokens / locks; AOF enabled) |
 | **Frontend** | Vue 3.5 · TypeScript 6.0 · Vite 8 · Vant 4.9 · Tailwind CSS 4 · Pinia 3 (+ persistedstate) · Vue Router 5 · TanStack Vue Query 5 · Axios · `qrcode` / `jsqr` |
-| **Testing** | Backend: JUnit 5 · AssertJ · MockMvc · a real concurrency harness (39 classes / 242 cases — `mvn -B test` green on 2026-10-29) · a 52-item API smoke script. Frontend: Vitest 4 (120 passed + 1 todo, 9 files, 2026-10-29) · Vue Test Utils · MSW · Playwright 1.54 (9 specs) · ESLint 10 / Prettier 3 |
+| **Testing** | Backend: JUnit 5 · AssertJ · MockMvc · a real concurrency harness (39 classes / 242 cases — `mvn -B test` green on 2026-10-29, 0 failures / 0 errors / 0 skipped) · a 52-item API smoke script. Frontend: Vitest 4 (120 passed + 1 todo, 9 files, 2026-10-29) · Vue Test Utils · MSW · Playwright 1.54 (9 specs) · ESLint 10 / Prettier 3 |
 | **Infra** | Docker Compose (MySQL, Redis, hot-reloading backend, frontend dev server) · GitHub Actions CI |
 
 ---
@@ -317,8 +320,8 @@ Lives in `.env` (never committed). See [`.env.example`](.env.example).
 
 ## 🧪 Testing
 
-Figures below come from the artifacts under `backend/test-results/`. Every number is quoted with
-the conditions it was measured under.
+Figures below come from the artifacts under `backend/test-results/` (**not committed** — local disk
+only). Every number is quoted with the conditions it was measured under.
 
 | Suite | Scale | Notes |
 |---|---|---|

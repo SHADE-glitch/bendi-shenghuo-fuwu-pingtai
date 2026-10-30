@@ -610,3 +610,75 @@ Cost     The stricter link checker now matches the sibling repo, so a docs edit 
          and metrics references will drift again with the next refactor.
 
 Commit   5f02584c
+
+### D-027 · 2026-10-29 · docs
+Symptom  The docs still presented the pre-R9 baseline as current in several places: the unique
+         key was described as the old full `uk_user_voucher`, the résumé map carried five
+         highlights, the audit snapshot lived in the live tree, and the frontend test count was
+         quoted without a passing run. Historical 34/213 artifacts and current 39/242 results
+         were easy to mix.
+Change   Rewrite the evidence index around the 2026-10-29 run (39 classes / 242 cases; entry P0,
+         post-commit compensation, V17 active-only key). Rewrite the résumé review and map for
+         the 4+4 R9 structure. Add `docs/03-deepen/06-ai-code-review.md` with risk classes,
+         eight-step acceptance and an A/B scope. Add deep-dive topic 11, decision-log DL-16/17/18
+         and QA Q34/Q35. Move `docs/audit/2026-10-25.md` and the pre-R9 evidence snapshot under
+         `docs/archive/2026-10/`. Replace remaining old-key references with
+         `uk_user_voucher_active`, keeping UF-004 explicitly historical.
+Evidence Docs-only. `check_doc_links.py` resolves 363 links and lists 29 of 29 Markdown files;
+         `check_layout.py`, `check_bilingual.py` and `check_backend_map.py` pass. Vitest was run
+         on 2026-10-29: 9 files, 120 passed + 1 todo, 0 failed. No Java source, migration, test or
+         preserved artifact was changed.
+Cost     Old deep links into the audit snapshot move one hop. The evidence index must be refreshed
+         after any rerun; historical 34/213 and 52/57 figures stay historical, not current.
+
+Commit   MIRROR-COMMIT (mirror of the source repository's change)
+
+### D-028 · 2026-10-29 · docs
+Symptom  The docs tree did not match the skeleton the sibling AI repo uses, and three gaps were
+         interview-visible: there was no self-introduction page and no credibility-defence page,
+         the evidence layer was a single 401-line file mixing index, test baseline, acceptance and
+         performance, and a sixth top-level directory (`99-worklog/`) held process notes the target
+         skeleton does not have. Worse, three live pages told the reader the verification artifacts
+         were in the repository — `test-results/` is git-ignored, so an interviewer who cloned the
+         repo would find nothing where the docs said to look.
+Change   Move to the shared skeleton: `03-deepen/04-glossary.md` → `02-learn/06-glossary.md`,
+         `05-ai-workflow` → `04-`, `06-ai-code-review` → `05-`; `04-interview/` renumbered to
+         `01-project-pitch` … `05-must-memorize`, with a new `00-self-intro.md` (30s / 1min / 3min,
+         shared verbatim with the sibling repo) and a new `06-credibility-defense.md`;
+         `90-evidence/01-git-history-map.md` → `04-git-history.md`. Split the evidence page into
+         `00` index / `01-test-baseline` / `02-evaluation` / `03-performance` and re-aim every `§N`
+         reference in layers 01–05. Add `90-evidence/05-artifacts/{eval,archive}/README.md` (product
+         slots; the artifacts stay uncommitted because that directory holds session-token files) and
+         move `docs/archive/2026-10/` under `90-evidence/06-archive/2026-10/`. Retire
+         `docs/99-worklog/`: its open items move to `03-deepen/03-boundaries.md` §7 (the two
+         git-history unknowns, the UF-004 date conflict, doc-vs-source coverage, the nature of the
+         concurrency evidence, three knowledge-base mapping unknowns, artifact sustainability, and
+         the lost UF-003/005/006 register); its AI boundaries were already in `04-ai-workflow.md`.
+         Facts corrected: `01-orientation.md` named V2 as the source of `uk_user_voucher_active`
+         (V2 created the full key, V17 created the active one and dropped the full one); the glossary
+         claimed three certainty levels (there are four) and its UF row now says UF-003/005/006 lost
+         their content with `BACKEND_FREEZE.md`. Résumé cards each gained a 业务问题 line and a
+         失败路径 table; the B-layer acceptance table now covers sign-in, upload, map/GEO,
+         follow/profile and the merchant shop/voucher/order surfaces; journey headings dropped their
+         month anchors into one table marked Unconfirmed (stage 8 excepted). Credibility:
+         `03-pressure-test.md` P01 / P03 and the AI-discipline answer no longer claim the raw
+         outputs are committed, and the `03-boundaries.md` artifact row says they are not.
+         Root layer: the README pair's documentation tables and artifact note; the `AGENTS.md` /
+         `AGENTS.zh-CN.md` pointer to the interview-expression discipline, which named a
+         `docs/README.md` section that had stopped being about discipline.
+Evidence Docs and the root file layer only. No Java source, migration, test, frontend source or
+         preserved artifact was touched, and no test or benchmark was rerun — every figure keeps its
+         snapshot date (2026-10-29 surefire and Vitest, 2026-10-06 smoke, 2026-10-01 Playwright,
+         2026-09-19 latency). `check_doc_links.py` resolves 534 links and lists 35 of 35 Markdown
+         files; `check_layout.py`, `check_bilingual.py` (3 pairs) and `check_backend_map.py`
+         (6 package rows, schema at V17) pass. Counts were re-derived by command rather than copied:
+         39 classes / 242 `@Test` annotations by static grep, and the ignore rules by
+         `git check-ignore -v` (`.gitignore:52`, `backend/.gitignore:2`).
+Cost     Deep links into the retired worklog and into `docs/archive/` move one hop, and the old
+         `§N` anchors of the evidence index no longer exist — an external note quoting "§5.1" must
+         be re-aimed at `01-test-baseline.md`. `00-self-intro.md` is duplicated verbatim in the
+         sibling repo and no guard compares the two, so editing one side alone is silent drift.
+         The artifacts are still uncommitted, so a fresh clone still cannot verify any figure
+         offline; the desensitised-summary proposal stays unexecuted.
+
+Commit   MIRROR-COMMIT (mirror of the source repository's change)
