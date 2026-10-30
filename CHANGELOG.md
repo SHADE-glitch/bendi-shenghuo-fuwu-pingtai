@@ -631,7 +631,7 @@ Evidence Docs-only. `check_doc_links.py` resolves 363 links and lists 29 of 29 M
 Cost     Old deep links into the audit snapshot move one hop. The evidence index must be refreshed
          after any rerun; historical 34/213 and 52/57 figures stay historical, not current.
 
-Commit   MIRROR-COMMIT (mirror of the source repository's change)
+Commit   45a808f (mirror of the source repository's change)
 
 ### D-028 · 2026-10-29 · docs
 Symptom  The docs tree did not match the skeleton the sibling AI repo uses, and three gaps were
@@ -681,4 +681,4 @@ Cost     Deep links into the retired worklog and into `docs/archive/` move one h
          The artifacts are still uncommitted, so a fresh clone still cannot verify any figure
          offline; the desensitised-summary proposal stays unexecuted.
 
-Commit   MIRROR-COMMIT (mirror of the source repository's change)
+Commit   45a808f (mirror of the source repository's change)
