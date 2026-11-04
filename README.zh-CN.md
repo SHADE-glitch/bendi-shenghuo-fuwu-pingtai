@@ -9,7 +9,7 @@
 项目有两条主线：**消费者侧**聚焦缓存策略、高并发下单与分布式协同；
 **商家侧**补上完整的角色鉴权、店铺归属、券管理与订单核销闭环。
 
-> **公开的纯代码展示仓。** 本仓只保留可运行代码与技术栈；完整开发历史、测试产物与面试文档在私有归档中。
+> **公开的纯代码展示仓。** 本仓只保留可运行代码与技术栈；
 
 ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-brightgreen?logo=springboot&logoColor=white)
