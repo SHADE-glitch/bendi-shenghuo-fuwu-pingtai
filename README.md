@@ -12,7 +12,6 @@ ordering, and distributed coordination. The **merchant side** adds a complete lo
 authorization, shop ownership, voucher management, and order redemption.
 
 > **Public, code-only showcase.** This repository carries the runnable code and the stack. Full
-> development history, test artifacts and interview notes live in a private archive.
 
 ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-brightgreen?logo=springboot&logoColor=white)
