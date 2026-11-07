@@ -34,7 +34,23 @@ authorization, shop ownership, voucher management, and order redemption.
 
 ---
 
-## 🛒 Core Business Loop
+## 📖 Table of Contents
+
+- [🔁 Core flow](#-core-flow)
+- [✨ Features](#-features)
+- [🏗️ Architecture](#️-architecture)
+- [🌟 Key engineering highlights](#-key-engineering-highlights)
+- [🧰 Tech stack](#-tech-stack)
+- [🚀 Quick start](#-quick-start)
+- [⚙️ Configuration](#️-configuration)
+- [🧪 Testing](#-testing)
+- [📚 Documentation](#-documentation)
+- [🧭 Project scope](#-project-scope)
+- [📊 Project status](#-project-status)
+- [🙏 Acknowledgements](#-acknowledgements)
+- [📄 License](#-license)
+
+## 🔁 Core flow
 
 ```
 User ──▶ Shop / Voucher ──▶ Seckill ──▶ One order per user ──▶ DB
@@ -49,6 +65,31 @@ directly or takes part in a flash sale. Seckill requests are gated in Redis by a
 stock check + one-order-per-user), acknowledged immediately, and persisted asynchronously by a Redis
 Stream consumer writing to MySQL. Every later step — pay, cancel, refund, redeem — moves the order
 through a CAS state machine.
+
+---
+
+## ✨ Features
+
+| Area | Feature | Notes |
+|---|---|---|
+| 🏪 | **Shops, categories, details** | Redis-cached with penetration / breakdown / avalanche guards; GEO powers map discovery |
+| ⚡ | **Seckill vouchers** | Lua-guarded high-concurrency ordering with async Stream persistence; DB CAS deduction |
+| 🎟️ | **Vouchers & orders** | Full lifecycle: browse → purchase / seckill → pay → cancel → refund → delete → redeem (with stock / placeholder rollback) |
+| 🧑‍💼 | **Merchant console** | Merchant identity & shop-ownership auth; my shops, shop edit, voucher create (regular / seckill), voucher edit, my vouchers, order query, redemption, dashboard with drill-down |
+| 🗺️ | **Map discovery** | AMap-backed map + `ShopGeoPreloadRunner` Redis GEO warmup |
+| 📷 | **QR codes** | Generate + scan (`qrcode` + `jsqr`) |
+| 📝 | **Blog notes** | Publish / detail (author, shop, comments) / like / my-blog list; aggregated on the shop detail page |
+| 💬 | **Shop reviews** | Query by shop / rating summary / create / my reviews / edit / delete |
+| 🔔 | **Message notifications** | Message list (like / follow / comment), unread count, mark-as-read / read-all |
+| 👥 | **Follow & profiles** | Follow / unfollow / follower list; public profile aggregation (notes + reviews) |
+| 🕘 | **Browse history** | Record / my history / clear |
+| 📮 | **Feedback** | Submit / my feedback / delete |
+| 📅 | **Daily check-in** | BitMap-backed; check-in / streak / today's status |
+| 📱 | **Mobile-first SPA** | Vant 4 + Tailwind CSS 4 — home, blog, messages, merchant console, profile, settings |
+| 🔐 | **Auth** | Token in Redis (carries `role`), `RefreshTokenInterceptor` + `LoginInterceptor` chain |
+| 🖼️ | **File uploads** | `UploadController` → local `uploads/icon` (2 MB, jpg / jpeg / png / webp) |
+| 🗃️ | **Schema automation** | Flyway V1–V17 builds the schema + seeds **1,290** shops across 45 cities and 13,601 vouchers (2,682 of them seckill) — no manual SQL |
+| 🐳 | **Docker infra** | Full-stack Compose with DevTools hot-reload + Vite HMR |
 
 ---
 
@@ -109,32 +150,7 @@ Stream consumer (single-thread executor)
 
 ---
 
-## ✨ Features
-
-| Area | Feature | Notes |
-|---|---|---|
-| 🏪 | **Shops, categories, details** | Redis-cached with penetration / breakdown / avalanche guards; GEO powers map discovery |
-| ⚡ | **Seckill vouchers** | Lua-guarded high-concurrency ordering with async Stream persistence; DB CAS deduction |
-| 🎟️ | **Vouchers & orders** | Full lifecycle: browse → purchase / seckill → pay → cancel → refund → delete → redeem (with stock / placeholder rollback) |
-| 🧑‍💼 | **Merchant console** | Merchant identity & shop-ownership auth; my shops, shop edit, voucher create (regular / seckill), voucher edit, my vouchers, order query, redemption, dashboard with drill-down |
-| 🗺️ | **Map discovery** | AMap-backed map + `ShopGeoPreloadRunner` Redis GEO warmup |
-| 📷 | **QR codes** | Generate + scan (`qrcode` + `jsqr`) |
-| 📝 | **Blog notes** | Publish / detail (author, shop, comments) / like / my-blog list; aggregated on the shop detail page |
-| 💬 | **Shop reviews** | Query by shop / rating summary / create / my reviews / edit / delete |
-| 🔔 | **Message notifications** | Message list (like / follow / comment), unread count, mark-as-read / read-all |
-| 👥 | **Follow & profiles** | Follow / unfollow / follower list; public profile aggregation (notes + reviews) |
-| 🕘 | **Browse history** | Record / my history / clear |
-| 📮 | **Feedback** | Submit / my feedback / delete |
-| 📅 | **Daily check-in** | BitMap-backed; check-in / streak / today's status |
-| 📱 | **Mobile-first SPA** | Vant 4 + Tailwind CSS 4 — home, blog, messages, merchant console, profile, settings |
-| 🔐 | **Auth** | Token in Redis (carries `role`), `RefreshTokenInterceptor` + `LoginInterceptor` chain |
-| 🖼️ | **File uploads** | `UploadController` → local `uploads/icon` (2 MB, jpg / jpeg / png / webp) |
-| 🗃️ | **Schema automation** | Flyway V1–V17 builds the schema + seeds **1,290** shops across 45 cities and 13,601 vouchers (2,682 of them seckill) — no manual SQL |
-| 🐳 | **Docker infra** | Full-stack Compose with DevTools hot-reload + Vite HMR |
-
----
-
-## 🌟 Key Engineering Highlights
+## 🌟 Key engineering highlights
 
 Each highlight is framed as **business problem → technical solution → why it was designed this way**.
 
@@ -232,7 +248,7 @@ Each highlight is framed as **business problem → technical solution → why it
 
 ---
 
-## 🧰 Tech Stack
+## 🧰 Tech stack
 
 | Layer | Technologies |
 |---|---|
@@ -244,7 +260,7 @@ Each highlight is framed as **business problem → technical solution → why it
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
 ### Prerequisites
 
@@ -355,7 +371,7 @@ These are local, single-machine results — not a production benchmark.
 
 ---
 
-## 🧭 Project Scope
+## 🧭 Project scope
 
 - **Architecture:** a **modular monolith** — one Spring Boot application and one deployment unit. It is
   intentionally *not* split into microservices.
@@ -370,7 +386,7 @@ These are local, single-machine results — not a production benchmark.
 
 ---
 
-## 📊 Project Status
+## 📊 Project status
 
 - Backend APIs for the consumer and merchant flows are complete.
 - 4 merchant frontend pages are wired up (dashboard, shops, vouchers, orders); all `/merchant/*` routes
